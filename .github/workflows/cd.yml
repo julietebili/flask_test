@@ -1,0 +1,34 @@
+name: Deploy to AWS EC2 Instance
+
+on:
+  workflow_run:
+    workflows: ["Docker Pipeline"]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Generate SSH key
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+
+    - name: Install Docker
+      uses: docker-practice/actions-setup-docker@master
+
+    - name: SSH into EC2 instance
+      env:
+        INSTANCE_IP: ${{ secrets.INSTANCE_IP }}
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      run: |
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa $INSTANCE_IP "sudo docker pull $DOCKER_USERNAME/betakopa-project:latest && sudo docker stop betakopa-project-container || true && sudo docker rm betakopa-project-container || true && sudo docker run -d --name betakopa-project-container -p 5000:5000 $DOCKER_USERNAME/betakopa-project:latest"
+        
+    
